@@ -19,6 +19,14 @@ void CreateRenderTarget();
 void CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+// Forward declarations (this lib)
+static int paCallback(const void*                     /*inputBuffer*/,
+                      void*                           outputBuffer,
+                      unsigned long                   framesPerBuffer,
+                      const PaStreamCallbackTimeInfo* /*timeInfo*/,
+                      PaStreamCallbackFlags           /*statusFlags*/,
+                      void*                           /*userData*/);
+
 #if LOG_SESSION_TO_FILE
 // Logging functionality - if enabled, logs all samples to a file for later review.
 // This ends up being extremely useful if there are issues to investigate.
@@ -222,7 +230,6 @@ void DrawOscilatorPlot(const std::vector<float>& logBufferL, const std::vector<f
 
 PaStream* InitializePAStream()
 {
-
     PaHostApiIndex const numAPIs = Pa_GetHostApiCount();
     if (numAPIs < 0)
         return nullptr;

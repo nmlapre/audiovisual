@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gcem/include/gcem.hpp"
+#include "gcem.hpp"
 
 #include <array>
 #include <cassert>
@@ -15,13 +15,13 @@ static constexpr double ONE_OVER_UINT16_MAX = 1.0 / UINT16_MAX;
 // My attempt to build wave tables at compile time. This can work, but MVSC
 // just doesn't have the chops right now to compile this. On my underpowered
 // laptop with 8GB of RAM, MVSC runs out of memory. GCC can handle it :)
-/*constexpr*/ auto csin(const double x)
+constexpr auto csin(const double x)
 {
     return gcem::sin(x);
 };
 
 template<class T, size_t N, class F>
-/*constexpr*/ auto make_table(F fn, size_t start)
+constexpr auto make_table(F fn, size_t start)
 {
     std::array<T, N> a{};
     for (size_t i = 0, val = start; i < N; ++i, ++val)
