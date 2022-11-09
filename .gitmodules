@@ -1,0 +1,18 @@
+[submodule "extern/farbot"]
+	path = extern/farbot
+	url = https://github.com/hogliux/farbot.git
+[submodule "extern/gcem"]
+	path = extern/gcem
+	url = https://github.com/kthohr/gcem.git
+[submodule "extern/AudioFile"]
+	path = extern/AudioFile
+	url = https://github.com/adamstark/AudioFile.git
+[submodule "extern/imgui"]
+	path = extern/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "extern/implot"]
+	path = extern/implot
+	url = https://github.com/epezent/implot.git
+[submodule "extern/portaudio"]
+	path = extern/portaudio
+	url = https://github.com/PortAudio/portaudio.git
