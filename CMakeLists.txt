@@ -7,6 +7,13 @@ if (!WIN32)
   message(ERROR "This only works on Windows right now. sry")
 endif()
 
+# statically link the runtime libraries
+add_compile_options(
+    $<$<CONFIG:>:/MT>
+    $<$<CONFIG:Debug>:/MTd>
+    $<$<CONFIG:Release>:/MT>
+)
+
 # grab the headers
 file(GLOB_RECURSE
      _header_list
@@ -14,10 +21,8 @@ file(GLOB_RECURSE
      "${CMAKE_SOURCE_DIR}"
      "${CMAKE_SOURCE_DIR}/include/*.h")
 
-# gotta set WIN32 here or everything breaks. hey why not
+# gotta set WIN32 here or everything breaks
 add_executable(audiovisual WIN32 main.cpp ${_header_list})
-# annoying, but so it goes
-add_definitions(-DNOMINMAX)
 
 # properties of various sorts
 set_property(TARGET audiovisual PROPERTY CXX_STANDARD 20)
@@ -28,19 +33,10 @@ target_compile_options(audiovisual PRIVATE /W4 /WX)
 source_group("Header Files" FILES ${_header_list})
 target_include_directories(audiovisual PRIVATE include)
 
-# add libraries
-add_subdirectory(lib/AudioFile)
-add_subdirectory(lib/farbot)
-add_subdirectory(lib/gcem)
-add_subdirectory(lib/imgui)
-add_subdirectory(lib/implot)
-add_subdirectory(lib/portaudio)
-
-# suppress annoying portaudio lib warning (type conversion)
-target_compile_options(portaudio PRIVATE /wd4312)
-target_compile_options(portaudio_static PRIVATE /wd4312)
+# add libraries for submodules
+add_subdirectory(extern)
 
 target_link_libraries(audiovisual
-                      imgui implot portaudio_static
+                      imgui implot PortAudio
                       AudioFile farbot gcem) # header-only libs (this propagates includes)
 
