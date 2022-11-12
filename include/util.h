@@ -1,6 +1,7 @@
 #pragma once
 
 #include "imgui.h"
+#include "portaudio.h"
 
 #include <vector>
 
@@ -52,3 +53,6 @@ constexpr float smoothstep(float edge0, float edge1, float x) {
     // Evaluate polynomial
     return x * x * (3 - 2 * x);
 }
+
+// Show portaudio debug info. Possibly useful for debugging.
+void ShowDebugInfo(PaStream* stream);

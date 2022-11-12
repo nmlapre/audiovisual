@@ -22,16 +22,16 @@ struct Generator
             switch (oscillator.getType())
             {
                 case OscillatorType::Sine:
-                    generateOscillatorValues(outputView, oscillator, sine);
+                    generateOscillatorValues(outputView, oscillator, WaveTables::getSine());
                     continue;
                 case OscillatorType::Square:
-                    generateOscillatorValues(outputView, oscillator, square);
+                    generateOscillatorValues(outputView, oscillator, WaveTables::getSquare());
                     continue;
                 case OscillatorType::Triangle:
-                    generateOscillatorValues(outputView, oscillator, triangle);
+                    generateOscillatorValues(outputView, oscillator, WaveTables::getTriangle());
                     continue;
                 case OscillatorType::Saw:
-                    generateOscillatorValues(outputView, oscillator, saw);
+                    generateOscillatorValues(outputView, oscillator, WaveTables::getSaw());
                     continue;
                 default:
                     assert(false); // Unknown oscillator type!
@@ -50,7 +50,7 @@ struct Generator
     __forceinline Oscillators<MAX_OSCILLATORS>& getOscillators() { return m_oscillators; }
 
 private:
-    void generateOscillatorValues(std::span<float>& output, Oscillator& oscillator, float(&table)[TABLE_SIZE])
+    void generateOscillatorValues(std::span<float>& output, Oscillator& oscillator, const std::array<float, TABLE_SIZE>& table)
     {
         for (size_t index = 0; index < output.size(); index += 2)
         {

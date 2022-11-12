@@ -2,6 +2,7 @@
 
 #include "constants.h"
 
+#include <algorithm>
 #include <functional>
 
 constexpr phase_t hz_to_delta(frequency_t hz)
