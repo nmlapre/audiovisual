@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "audiovisual.h"
+#include "oscillator_ui.h"
 
 #define LOG_SESSION_TO_FILE false
 
@@ -71,116 +72,6 @@ void CopyBufferAndDefer(const float* out, unsigned long framesPerBuffer)
         });
 }
 #endif
-
-// Draw the UI of the oscillator generator settings. Allows customizing each oscillator.
-// Allows adding, removing, temporarily muting, changing frequency, volume, panning, etc.
-void DrawGeneratorUI(PaStream* stream)
-{
-    auto& requestIds = GetRequestIds();
-    auto& uiOscillatorView = GetUIOscillatorView();
-
-    ImGui::Text("Adjust settings of the generator:");
-
-    if (ImGui::Button("Add Oscillator"))
-    {
-        const RequestId requestId = GetNextRequestId();
-        requestIds.push(requestId);
-        EventBuilder::PushAddOscillatorEvent(
-            requestId,
-            OscillatorSettings(OscillatorType::Sine, 200., .2f));
-    }
-
-    // TODO: make this a ui oscillator view Show function:
-    for (const auto& [oscillatorId, settings] : uiOscillatorView)
-    {
-        char removeLabel[100];
-        sprintf_s(removeLabel, "Remove##%u", oscillatorId);
-        if (ImGui::Button(removeLabel))
-        {
-            const RequestId requestId = GetNextRequestId();
-            requestIds.push(requestId);
-            EventBuilder::PushRemoveOscillatorEvent(requestId, oscillatorId);
-        }
-
-        ImGui::SameLine();
-        bool activeBool = settings.state == OscillatorState::Active;
-        char activeLabel[100];
-        sprintf_s(activeLabel, "Active##%u", oscillatorId);
-        if (ImGui::Checkbox(activeLabel, &activeBool))
-        {
-            const RequestId requestId = GetNextRequestId();
-            requestIds.push(requestId);
-
-            if (activeBool)
-                EventBuilder::PushActivateOscillatorEvent(requestId, oscillatorId, settings.volume);
-            else
-                EventBuilder::PushDeactivateOscillatorEvent(requestId, oscillatorId);
-        }
-
-        ImGui::SameLine();
-        const char* types[] = { "Sine", "Square", "Triangle", "Saw" };
-        const int currentIndex = int(settings.type);
-        const char* comboLabel = types[currentIndex];
-        char typeLabel[100];
-        sprintf_s(typeLabel, "Type##%u", oscillatorId);
-        ImGui::SetNextItemWidth(100.0f);
-        if (ImGui::BeginCombo(typeLabel, comboLabel))
-        {
-            for (int n = 0; n < IM_ARRAYSIZE(types); n++)
-            {
-                const bool isSelected = (currentIndex == n);
-                if (isSelected)
-                    ImGui::SetItemDefaultFocus();
-
-                if (ImGui::Selectable(types[n], isSelected))
-                {
-                    if (isSelected)
-                        break;
-
-                    const RequestId requestId = GetNextRequestId();
-                    requestIds.push(requestId);
-                    EventBuilder::PushSetOscillatorTypeEvent(requestId, oscillatorId, OscillatorType(n));
-                }
-            }
-            ImGui::EndCombo();
-        }
-
-        volume_t volume = settings.volume;
-        char volumeLabel[100];
-        sprintf_s(volumeLabel, "Volume##%u", oscillatorId);
-        if (ImGui::SliderFloat(volumeLabel, &volume, 0.0f, 1.0f))
-        {
-            const RequestId requestId = GetNextRequestId();
-            requestIds.push(requestId);
-            EventBuilder::PushSetOscillatorVolumeEvent(requestId, oscillatorId, volume);
-        }
-
-        pan_t pan = settings.pan;
-        char panLabel[100];
-        sprintf_s(panLabel, "Pan##%u", oscillatorId);
-        if (ImGui::SliderFloat(panLabel, &pan, -1.0f, 1.0f))
-        {
-            const RequestId requestId = GetNextRequestId();
-            requestIds.push(requestId);
-            EventBuilder::PushSetOscillatorPanEvent(requestId, oscillatorId, pan);
-        }
-
-        frequency_t frequency = settings.frequency;
-        char frequencyLabel[100];
-        sprintf_s(frequencyLabel, "Frequency##%u", oscillatorId);
-        if (ImGui::SliderFloat(frequencyLabel, &frequency, 20.0f, 8000.0f, "%.3f", ImGuiSliderFlags_Logarithmic))
-        {
-            const RequestId requestId = GetNextRequestId();
-            requestIds.push(requestId);
-            EventBuilder::PushSetOscillatorFrequencyEvent(requestId, oscillatorId, frequency);
-        }
-
-        ImGui::NewLine();
-    }
-
-    const double cpuLoad = Pa_GetStreamCpuLoad(stream);
-    ImGui::Text("Audio stream CPU load: %f", cpuLoad);
-}
 
 // Draw a live updating graph of L, R signals. Right now it moves too fast and I get dizzy lol
 // Requires log buffers (LOG_SESSION_TO_FILE), which should probably be moving windows of history.
@@ -253,8 +144,8 @@ PaStream* InitializePAStream()
         wasapiStreamInfo->size = sizeof(PaWasapiStreamInfo);
         wasapiStreamInfo->hostApiType = PaHostApiTypeId::paWASAPI;
         wasapiStreamInfo->version = 1;
-        wasapiStreamInfo->flags = paWinWasapiExclusive; // requires software limiting. watch your ears :)
-        //wasapiStreamInfo->flags = paWinWasapiThreadPriority;
+        //wasapiStreamInfo->flags = paWinWasapiExclusive; // requires software limiting. watch your ears :)
+        wasapiStreamInfo->flags = paWinWasapiThreadPriority;
         wasapiStreamInfo->threadPriority = PaWasapiThreadPriority::eThreadPriorityProAudio;
         wasapiStreamInfo->streamCategory = PaWasapiStreamCategory::eAudioCategoryGameMedia;
         wasapiStreamInfo->streamOption = PaWasapiStreamOption::eStreamOptionRaw;
@@ -334,7 +225,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
     // GCC is fine with it. It's fine to just initialize tables at startup.
     //constexpr auto SIN_TABLE = make_table<double, UINT16_MAX>(csin, 0);
 
-    InitializeGlobalTables();
+    WaveTables::Initialize();
 
     PaStream* stream = InitializePAStream();
     if (stream == nullptr)
@@ -389,7 +280,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
 
             // Handle communication from realtime thread
             (void)ThreadCommunication::processDeferredActions();
-            HandleRealTimeThreadResponse();
+            GetUIOscillatorView().HandleRealTimeResponse();
 
             // Start the Dear ImGui frame
             ImGui_ImplDX11_NewFrame();
@@ -397,7 +288,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
             ImGui::NewFrame();
 
             ImGui::Begin("Generator Settings");
-            DrawGeneratorUI(stream);
+            GetUIOscillatorView().Show();
+            ImGui::End();
+
+            ImGui::Begin("Debug Info");
+            ShowDebugInfo(stream);
             ImGui::End();
 
             // Rendering

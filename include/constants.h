@@ -228,24 +228,13 @@ using OscillatorId = uint8_t;
 
 // Wave tables: these need multiplying by amplitude at runtime.
 constexpr size_t TABLE_SIZE = UINT16_MAX;
-static float sine     [TABLE_SIZE];
-static float square   [TABLE_SIZE];
-static float triangle [TABLE_SIZE];
-static float saw      [TABLE_SIZE];
-
-// Call on startup to fill up the wave tables above.
-void InitializeGlobalTables()
+struct WaveTables
 {
-    for (size_t i = 0; i < TABLE_SIZE; i++)
-    {
-        double const phaseAtTime = std::sin(double(i) * ONE_OVER_MAX_PHASE_X_TWO_PI);
-        sine    [i] = float(phaseAtTime);
-        square  [i] = phaseAtTime >= 0 ? .5f : -.5f;
-        triangle[i] = float(TWO_OVER_PI * std::asin(phaseAtTime));
-        saw     [i] = float(i * ONE_OVER_MAX_PHASE * 2. - 1.);  // not sure this is exactly the right shape yet lol. it's pretty loud
+    // Call on startup to fill up the wave tables above.
+    static void Initialize();
 
-        // saw that starts at 0:
-        //float const progress = i * ONE_OVER_MAX_PHASE;
-        //saw     [i] = (progress * 2.f) <= 1.0f ? (progress * 2.0f) : -2.0f + (progress * 2.0f);
-    }
-}
+    static std::array<float, TABLE_SIZE>& getSine();
+    static std::array<float, TABLE_SIZE>& getSquare();
+    static std::array<float, TABLE_SIZE>& getTriangle();
+    static std::array<float, TABLE_SIZE>& getSaw();
+};
