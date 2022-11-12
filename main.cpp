@@ -77,34 +77,41 @@ void CopyBufferAndDefer(const float* out, unsigned long framesPerBuffer)
 // Requires log buffers (LOG_SESSION_TO_FILE), which should probably be moving windows of history.
 void DrawOscilatorPlot(const std::vector<float>& logBufferL, const std::vector<float>& logBufferR)
 {
+    static bool paused = false;
+    ImGui::Checkbox("Paused", &paused);
+
     static float t = 0.0f;
     static float lastTime = 0.0f;
     static ScrollingBuffer<50000> sdata1, sdata2;
     static size_t nextIndexToGraphL = 0;
     static size_t nextIndexToGraphR = 0;
     lastTime = t;
-    t += ImGui::GetIO().DeltaTime;
 
-    const size_t diffL = logBufferL.size() - nextIndexToGraphL;
-    size_t indexCounterL = 0;
-    while (nextIndexToGraphL < logBufferL.size())
+    if (!paused)
     {
-        sdata1.addPoint(std::lerp(lastTime, t, float(indexCounterL) / diffL), logBufferL[nextIndexToGraphL]);
-        nextIndexToGraphL++;
-        indexCounterL++;
-    }
+        t += ImGui::GetIO().DeltaTime;
 
-    const size_t diffR = logBufferR.size() - nextIndexToGraphR;
-    size_t indexCounterR = 0;
-    while (nextIndexToGraphR < logBufferR.size())
-    {
-        sdata2.addPoint(std::lerp(lastTime, t, float(indexCounterR) / diffR), logBufferR[nextIndexToGraphR]);
-        nextIndexToGraphR++;
-        indexCounterR++;
+        const size_t diffL = logBufferL.size() - nextIndexToGraphL;
+        size_t indexCounterL = 0;
+        while (nextIndexToGraphL < logBufferL.size())
+        {
+            sdata1.addPoint(std::lerp(lastTime, t, float(indexCounterL) / diffL), logBufferL[nextIndexToGraphL]);
+            nextIndexToGraphL++;
+            indexCounterL++;
+        }
+
+        const size_t diffR = logBufferR.size() - nextIndexToGraphR;
+        size_t indexCounterR = 0;
+        while (nextIndexToGraphR < logBufferR.size())
+        {
+            sdata2.addPoint(std::lerp(lastTime, t, float(indexCounterR) / diffR), logBufferR[nextIndexToGraphR]);
+            nextIndexToGraphR++;
+            indexCounterR++;
+        }
     }
 
     static float history = 3.0f;
-    ImGui::SliderFloat("History", &history, .001f, 3.0f, "%.1f s", ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderFloat("History", &history, .001f, 3.0f, "%.2f s", ImGuiSliderFlags_Logarithmic);
 
     static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
 
@@ -113,8 +120,8 @@ void DrawOscilatorPlot(const std::vector<float>& logBufferL, const std::vector<f
         ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
         ImPlot::SetupAxisLimits(ImAxis_Y1, -1.0f, 1.0f);
         ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.5f);
-        ImPlot::PlotLine("L", &sdata1.buffer[0].x, &sdata1.buffer[0].y, int(sdata1.buffer.size()), int(sdata1.offset), sizeof(ImVec2));
-        ImPlot::PlotLine("R", &sdata2.buffer[0].x, &sdata2.buffer[0].y, int(sdata2.buffer.size()), int(sdata2.offset), sizeof(ImVec2));
+        ImPlot::PlotLine("L", &sdata1.buffer[0].x, &sdata1.buffer[0].y, int(sdata1.buffer.size()), ImPlotLineFlags_None, int(sdata1.offset), sizeof(ImVec2));
+        ImPlot::PlotLine("R", &sdata2.buffer[0].x, &sdata2.buffer[0].y, int(sdata2.buffer.size()), ImPlotLineFlags_None, int(sdata2.offset), sizeof(ImVec2));
         ImPlot::EndPlot();
     }
 }
@@ -294,6 +301,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
             ImGui::Begin("Debug Info");
             ShowDebugInfo(stream);
             ImGui::End();
+
+#if LOG_SESSION_TO_FILE
+            ImGui::Begin("Oscillator Plot");
+            DrawOscilatorPlot(g_logBufferLeft, g_logBufferRight);
+            ImGui::End();
+#endif
 
             // Rendering
             ImGui::Render();
