@@ -26,7 +26,7 @@ file(GLOB_RECURSE
      _private_source_list
      RELATIVE
      "${CMAKE_SOURCE_DIR}"
-     "${CMAKE_SOURCE_DIR}/include/*.cpp")
+     "${CMAKE_SOURCE_DIR}/src/*.cpp")
 
 # gotta set WIN32 here or everything breaks
 add_executable(audiovisual WIN32 main.cpp ${_private_source_list} ${_header_list})
