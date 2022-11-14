@@ -3,9 +3,9 @@
 
 #include "framework.h"
 #include "audiovisual.h"
+#include "logging.h"
 #include "oscillator_ui.h"
-
-#define LOG_SESSION_TO_FILE false
+#include "plotting.h"
 
 // Data (imgui)
 static ID3D11Device* g_pd3dDevice = NULL;
@@ -27,104 +27,6 @@ static int paCallback(const void*                     /*inputBuffer*/,
                       const PaStreamCallbackTimeInfo* /*timeInfo*/,
                       PaStreamCallbackFlags           /*statusFlags*/,
                       void*                           /*userData*/);
-
-#if LOG_SESSION_TO_FILE
-// Logging functionality - if enabled, logs all samples to a file for later review.
-// This ends up being extremely useful if there are issues to investigate.
-std::vector<float> g_logBufferLeft;
-std::vector<float> g_logBufferRight;
-void WriteToLogBuffer(const std::vector<float>& samplesLeft, const std::vector<float>& samplesRight)
-{
-    for (auto& sample : samplesLeft)
-        g_logBufferLeft.push_back(sample);
-
-    for (auto& sample : samplesRight)
-        g_logBufferRight.push_back(sample);
-}
-void WriteSessionToFile()
-{
-    AudioFile<float>::AudioBuffer buffer;
-    buffer.resize(2);
-    buffer.at(0) = std::move(g_logBufferLeft);
-    buffer.at(1) = std::move(g_logBufferRight);
-
-    AudioFile<float> audioFile;
-    audioFile.setNumChannels(2);
-    audioFile.setSampleRate(44100);
-    audioFile.setAudioBuffer(buffer);
-    audioFile.save("test.wav");
-}
-void CopyBufferAndDefer(const float* out, unsigned long framesPerBuffer)
-{
-    std::vector<float> floatsLeft;
-    std::vector<float> floatsRight;
-    floatsLeft.reserve(framesPerBuffer); // allocating on the realtime thread! bad!
-    floatsRight.reserve(framesPerBuffer); // allocating on the realtime thread! bad!
-    for (unsigned index = 0; index < framesPerBuffer; ++index)
-    {
-        floatsLeft.push_back(*out++);
-        floatsRight.push_back(*out++);
-    }
-
-    ThreadCommunication::deferToNonRealtimeThread(
-        [samplesLeft = std::move(floatsLeft), samplesRight = std::move(floatsRight)](){
-            WriteToLogBuffer(samplesLeft, samplesRight);
-        });
-}
-#endif
-
-// Draw a live updating graph of L, R signals. Right now it moves too fast and I get dizzy lol
-// Requires log buffers (LOG_SESSION_TO_FILE), which should probably be moving windows of history.
-void DrawOscilatorPlot(const std::vector<float>& logBufferL, const std::vector<float>& logBufferR)
-{
-    static bool paused = false;
-    ImGui::Checkbox("Paused", &paused);
-
-    static float t = 0.0f;
-    static float lastTime = 0.0f;
-    static ScrollingBuffer<50000> sdata1, sdata2;
-    static size_t nextIndexToGraphL = 0;
-    static size_t nextIndexToGraphR = 0;
-    lastTime = t;
-
-    if (!paused)
-    {
-        t += ImGui::GetIO().DeltaTime;
-
-        const size_t diffL = logBufferL.size() - nextIndexToGraphL;
-        size_t indexCounterL = 0;
-        while (nextIndexToGraphL < logBufferL.size())
-        {
-            sdata1.addPoint(std::lerp(lastTime, t, float(indexCounterL) / diffL), logBufferL[nextIndexToGraphL]);
-            nextIndexToGraphL++;
-            indexCounterL++;
-        }
-
-        const size_t diffR = logBufferR.size() - nextIndexToGraphR;
-        size_t indexCounterR = 0;
-        while (nextIndexToGraphR < logBufferR.size())
-        {
-            sdata2.addPoint(std::lerp(lastTime, t, float(indexCounterR) / diffR), logBufferR[nextIndexToGraphR]);
-            nextIndexToGraphR++;
-            indexCounterR++;
-        }
-    }
-
-    static float history = 3.0f;
-    ImGui::SliderFloat("History", &history, .001f, 3.0f, "%.2f s", ImGuiSliderFlags_Logarithmic);
-
-    static ImPlotAxisFlags flags = ImPlotAxisFlags_NoTickLabels;
-
-    if (ImPlot::BeginPlot("##Scrolling", ImVec2(-1, 150))) {
-        ImPlot::SetupAxes(NULL, NULL, flags, flags);
-        ImPlot::SetupAxisLimits(ImAxis_X1, t - history, t, ImGuiCond_Always);
-        ImPlot::SetupAxisLimits(ImAxis_Y1, -1.0f, 1.0f);
-        ImPlot::SetNextFillStyle(IMPLOT_AUTO_COL, 0.5f);
-        ImPlot::PlotLine("L", &sdata1.buffer[0].x, &sdata1.buffer[0].y, int(sdata1.buffer.size()), ImPlotLineFlags_None, int(sdata1.offset), sizeof(ImVec2));
-        ImPlot::PlotLine("R", &sdata2.buffer[0].x, &sdata2.buffer[0].y, int(sdata2.buffer.size()), ImPlotLineFlags_None, int(sdata2.offset), sizeof(ImVec2));
-        ImPlot::EndPlot();
-    }
-}
 
 PaStream* InitializePAStream()
 {
@@ -214,7 +116,7 @@ static int paCallback(const void*                     /*inputBuffer*/,
     generator.writeSamples(std::span<float>(out, framesPerBuffer * 2ul));
     
 #if LOG_SESSION_TO_FILE
-    CopyBufferAndDefer(out, framesPerBuffer);
+    Logging::CopyBufferAndDefer(out, framesPerBuffer);
 #endif
 
     return paContinue;
@@ -304,7 +206,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
 
 #if LOG_SESSION_TO_FILE
             ImGui::Begin("Oscillator Plot");
-            DrawOscilatorPlot(g_logBufferLeft, g_logBufferRight);
+            auto [logBufferLeft, logBufferRight] = Logging::GetLogBuffers();
+            Plotting::DrawOscilatorPlot(logBufferLeft.get(), logBufferRight.get());
             ImGui::End();
 #endif
 
@@ -334,7 +237,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
     Pa_Terminate();
 
 #if LOG_SESSION_TO_FILE
-    WriteSessionToFile();
+    Logging::WriteSessionToFile();
 #endif
 
     return 0;
