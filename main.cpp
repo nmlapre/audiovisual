@@ -5,85 +5,9 @@
 #include "audiovisual.h"
 #include "logging.h"
 #include "oscillator_ui.h"
+#include "pa_management.h"
 #include "plotting.h"
 #include "windowing.h"
-
-// Forward declarations (this lib)
-static int paCallback(const void*                     /*inputBuffer*/,
-                      void*                           outputBuffer,
-                      unsigned long                   framesPerBuffer,
-                      const PaStreamCallbackTimeInfo* /*timeInfo*/,
-                      PaStreamCallbackFlags           /*statusFlags*/,
-                      void*                           /*userData*/);
-
-PaStream* InitializePAStream()
-{
-    PaHostApiIndex const numAPIs = Pa_GetHostApiCount();
-    if (numAPIs < 0)
-        return nullptr;
-
-    PaHostApiInfo const* hostApiInfo;
-    PaDeviceIndex devIndex = 0;
-    for (PaHostApiIndex i = 0; i < numAPIs; i++)
-    {
-        hostApiInfo = Pa_GetHostApiInfo(i);
-        //if (hostApiInfo && hostApiInfo->type == paASIO)
-        if (hostApiInfo && hostApiInfo->type == paWASAPI)
-        {
-            devIndex = hostApiInfo->defaultOutputDevice;
-            break;
-        }
-    }
-
-    // WASAPI-specific stream parameters
-    auto wasapiStreamInfo = std::make_unique<PaWasapiStreamInfo>();
-    {
-        wasapiStreamInfo->size = sizeof(PaWasapiStreamInfo);
-        wasapiStreamInfo->hostApiType = PaHostApiTypeId::paWASAPI;
-        wasapiStreamInfo->version = 1;
-        //wasapiStreamInfo->flags = paWinWasapiExclusive; // requires software limiting. watch your ears :)
-        wasapiStreamInfo->flags = paWinWasapiThreadPriority;
-        wasapiStreamInfo->threadPriority = PaWasapiThreadPriority::eThreadPriorityProAudio;
-        wasapiStreamInfo->streamCategory = PaWasapiStreamCategory::eAudioCategoryGameMedia;
-        wasapiStreamInfo->streamOption = PaWasapiStreamOption::eStreamOptionRaw;
-    }
-
-    // ASIO-specific stream parameters. Use if using ASIO.
-    //auto asioStreamInfo = std::make_unique<PaAsioStreamInfo>();
-    //struct IntTwo { int data[2]{ 0, 1 }; };
-    //auto channelSelectors = std::make_unique<IntTwo>();
-    //{
-    //    asioStreamInfo->size = sizeof(PaAsioStreamInfo);
-    //    asioStreamInfo->hostApiType = paASIO;
-    //    asioStreamInfo->version = 1;
-    //    asioStreamInfo->flags = paAsioUseChannelSelectors;
-    //    asioStreamInfo->channelSelectors = (int*)&channelSelectors->data;
-    //}
-
-    PaStreamParameters outputParameters;
-    outputParameters.channelCount = 2;
-    outputParameters.device = devIndex;
-    outputParameters.hostApiSpecificStreamInfo = wasapiStreamInfo.get();
-    //outputParameters.hostApiSpecificStreamInfo = asioStreamInfo.get();
-    outputParameters.sampleFormat = paFloat32;
-    outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
-
-    PaError err;
-    PaStream* stream;
-    err = Pa_OpenStream(&stream,
-        NULL,
-        &outputParameters,
-        SAMPLE_RATE,
-        paFramesPerBufferUnspecified,
-        paClipOff,
-        paCallback,
-        nullptr);
-    assert(err == PaErrorCode::paNoError);
-    err = Pa_StartStream(stream);
-    assert(err == PaErrorCode::paNoError);
-    
-    return stream;
-}
 
 // This function runs on the realtime thread provided by portaudio.
 // It should not make any system calls (incl. allocation). It should primarily
@@ -118,14 +42,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
     if (Pa_Initialize() != paNoError)
         return -1;
 
-    WaveTables::Initialize();
-
-    PaStream* stream = InitializePAStream();
+    PaStream* stream = InitializePAStream(paCallback);
     if (stream == nullptr)
         return -1;
 
-        if (!InitImGuiRendering())
-            return 1;
+    WaveTables::Initialize();
+
+    if (!InitImGuiRendering())
+        return 1;
 
     // Main loop
     bool done = false;
@@ -167,10 +91,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
     }
 
     TearDownWindowRendering();
-
-    Pa_StopStream(stream);
-    Pa_CloseStream(stream);
-    Pa_Terminate();
+    TearDownPAStream(stream);
 
 #if LOG_SESSION_TO_FILE
     Logging::WriteSessionToFile();
