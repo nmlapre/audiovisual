@@ -130,10 +130,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE    /*hInstance*/,
     if (Pa_Initialize() != paNoError)
         return -1;
 
-    // As of writing this, MVSC isn't quite able to handle this much constexpr.
-    // GCC is fine with it. It's fine to just initialize tables at startup.
-    //constexpr auto SIN_TABLE = make_table<double, UINT16_MAX>(csin, 0);
-
     WaveTables::Initialize();
 
     PaStream* stream = InitializePAStream();
