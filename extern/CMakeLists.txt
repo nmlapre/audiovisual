@@ -53,6 +53,5 @@ target_sources(implot
                    implot/implot.cpp)
 
 # portaudio
-option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 add_subdirectory(portaudio EXCLUDE_FROM_ALL) # exclude uninstall target
 

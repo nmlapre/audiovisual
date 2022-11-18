@@ -12,14 +12,12 @@ static constexpr double const PI = gcem::acos(-1);
 static constexpr double TWO_PI = 2 * PI;
 static constexpr double ONE_OVER_UINT16_MAX = 1.0 / UINT16_MAX;
 
-// My attempt to build wave tables at compile time. This can work, but MVSC
-// just doesn't have the chops right now to compile this. On my underpowered
-// laptop with 8GB of RAM, MVSC runs out of memory. GCC can handle it :)
 constexpr auto csin(const double x)
 {
     return gcem::sin(x);
 };
 
+// Build an array up in a constexpr context. Useful for building compile time wave tables.
 template<class T, size_t N, class F>
 constexpr auto make_table(F fn, size_t start)
 {
@@ -30,8 +28,8 @@ constexpr auto make_table(F fn, size_t start)
     return a;
 }
 
-// Out of heap space...need more than 8GB RAM to build this constexpr.
-// The same compiles in 15 seconds on GCC10.2, and uses ~500MB RAM, lol.
+// TODO: enable this with a special option (probably a define) that opts into longer compile times
+// the option should switch between runtime and compile time wave table initialization.
 //static constexpr auto SIN_TABLE = make_table<double, UINT16_MAX>(csin, 0);
 
 // Notes

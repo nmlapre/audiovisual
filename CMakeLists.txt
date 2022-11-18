@@ -8,6 +8,7 @@ if (!WIN32)
 endif()
 
 # statically link the runtime libraries
+option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 add_compile_options(
     $<$<CONFIG:>:/MT>
     $<$<CONFIG:Debug>:/MTd>
@@ -35,9 +36,11 @@ add_executable(audiovisual WIN32 main.cpp ${_private_source_list} ${_header_list
 set_property(TARGET audiovisual PROPERTY CXX_STANDARD 20)
 target_compile_options(audiovisual PRIVATE /W4 /WX)
 
-# include the files for the top-level project.
-# while we're at it let's get 'em in a source group. why not
+# let's get these files in some source groups. why not
 source_group("Header Files" FILES ${_header_list})
+source_group("Private Source Fies" FILES ${_private_source_list})
+
+# include the files for the top-level project.
 target_include_directories(audiovisual PRIVATE include)
 
 # add libraries for submodules
